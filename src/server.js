@@ -11,26 +11,34 @@ const app = express();
 // ─────────────────────────────────────────────
 
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
   "https://new-sip-and-bite.vercel.app",
+  process.env.FRONTEND_URL,
   "http://localhost:5173",
 ].filter(Boolean);
 
+console.log("Allowed CORS origins:", allowedOrigins);
+
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests without an Origin header
-    // (Postman, server-to-server requests, etc.)
+    console.log("Incoming request origin:", origin);
+
+    // Requests without an Origin header
+    // are allowed (Postman, server-to-server, etc.)
     if (!origin) {
       return callback(null, true);
     }
 
     if (allowedOrigins.includes(origin)) {
+      console.log("CORS allowed:", origin);
       return callback(null, true);
     }
 
-    console.warn(`CORS blocked origin: ${origin}`);
+    console.warn("CORS rejected:", origin);
 
-    return callback(new Error("Not allowed by CORS"));
+    // IMPORTANT:
+    // Do not throw an error here.
+    // Simply don't grant CORS access.
+    return callback(null, false);
   },
 
   credentials: true,
@@ -43,6 +51,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
