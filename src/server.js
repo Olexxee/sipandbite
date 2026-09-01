@@ -11,7 +11,7 @@ const app = express();
 // ─────────────────────────────────────────────
 
 const allowedOrigins = [
-  "https://new-sip-and-bite.vercel.app",
+  "https://new-sipand-bite.vercel.app",
   process.env.FRONTEND_URL,
   "http://localhost:5173",
 ].filter(Boolean);
@@ -20,24 +20,18 @@ console.log("Allowed CORS origins:", allowedOrigins);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log("Incoming request origin:", origin);
+    console.log("Incoming Origin:", origin);
 
-    // Requests without an Origin header
-    // are allowed (Postman, server-to-server, etc.)
     if (!origin) {
       return callback(null, true);
     }
 
     if (allowedOrigins.includes(origin)) {
-      console.log("CORS allowed:", origin);
+      console.log("CORS ALLOWED:", origin);
       return callback(null, true);
     }
 
-    console.warn("CORS rejected:", origin);
-
-    // IMPORTANT:
-    // Do not throw an error here.
-    // Simply don't grant CORS access.
+    console.log("CORS REJECTED:", origin);
     return callback(null, false);
   },
 
