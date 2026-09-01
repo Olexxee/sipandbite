@@ -6,7 +6,7 @@ import menuRouter from "./routes/menuRoutes.js";
 const app = express();
 
 const allowedOrigins = [
-  "http://localhost:3000",
+  "https://new-sipand-bite.vercel.app/",
   "http://localhost:5173",
   process.env.FRONTEND_URL,
   "",
