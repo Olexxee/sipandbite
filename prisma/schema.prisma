@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MenuCategory {
+  FOOD
+  DRINK
+  ROOM
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admins")
+}
+
+model MenuItem {
+  id        String       @id @default(uuid())
+  name      String
+  price     Decimal      @db.Decimal(10, 2)
+  category  MenuCategory
+
+  imageUrl  String?
+  publicId  String?
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([category])
+  @@map("menu_items")
+}

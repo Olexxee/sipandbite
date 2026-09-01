@@ -1,5 +1,9 @@
 import express from "express";
+
 import { verifyAdmin } from "../middlewares/auth.js";
+import processMedia from "../middlewares/processMedia.js";
+import validate from "../middlewares/validate.js";
+
 import {
   getMenu,
   createMenuItem,
@@ -7,14 +11,38 @@ import {
   deleteMenuItem,
 } from "../controller/menuController.js";
 
-const menuRouter = express.Router();
+import {
+  createMenuSchema,
+  updateMenuSchema,
+} from "../validators/menu.validator.js";
 
-menuRouter.get("/", getMenu);
+const router = express.Router();
 
-menuRouter.post("/", verifyAdmin, createMenuItem);
+// Public
+router.get("/", getMenu);
 
-menuRouter.patch("/:id", verifyAdmin, updateMenuItem);
+// Protected
+router.post(
+  "/",
+  verifyAdmin,
+  processMedia, // Parse multipart/form-data first
+  validate(createMenuSchema), // Then validate req.body
+  createMenuItem,
+);
 
-menuRouter.delete("/:id", verifyAdmin, deleteMenuItem);
+router.patch(
+  "/:id",
+  verifyAdmin,
+  processMedia, // Parse multipart/form-data first
+  validate(updateMenuSchema),
+  updateMenuItem,
+);
 
-export default menuRouter;
+router.delete(
+  "/:id",
+  verifyAdmin,
+  deleteMenuItem,
+);
+
+export default router;
+
