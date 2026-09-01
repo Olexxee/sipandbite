@@ -4,9 +4,11 @@
   "description": "sip and bite hotel and lounge",
   "main": "main.js",
   "type": "module",
-  "scripts": {
+"scripts": {
     "dev": "nodemon main.js",
-    "create:admin": "node createAdmin.js",
+    "create:admin": "node scripts/createAdmin.js",
+    "generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy",
     "start": "node main.js",
     "migrate:logger": "node scripts/migrateConsoleToLogger.js"
   },
