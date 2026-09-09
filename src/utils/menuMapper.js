@@ -1,15 +1,25 @@
 const toMenuResponse = (item) => {
+  const images = (item.images || []).map((image) => ({
+    id: image.id,
+    url: image.url,
+    publicId: image.publicId,
+    order: image.order,
+  }));
+
   return {
     id: item.id,
     name: item.name,
     price: Number(item.price),
 
-    // Frontend uses lowercase categories
     category: item.category.toLowerCase(),
 
-    image: {
-      url: item.imageUrl || "",
-      publicId: item.publicId || "",
+    images,
+
+    // Convenience field for existing frontend code.
+    // This points to the first image.
+    image: images[0] || {
+      url: "",
+      publicId: "",
     },
 
     createdAt: item.createdAt,
@@ -18,4 +28,3 @@ const toMenuResponse = (item) => {
 };
 
 export default toMenuResponse;
-

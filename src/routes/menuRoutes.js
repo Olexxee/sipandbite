@@ -1,5 +1,4 @@
 import express from "express";
-
 import { verifyAdmin } from "../middlewares/auth.js";
 import processMedia from "../middlewares/processMedia.js";
 import validate from "../middlewares/validate.js";
@@ -25,24 +24,19 @@ router.get("/", getMenu);
 router.post(
   "/",
   verifyAdmin,
-  processMedia, // Parse multipart/form-data first
-  validate(createMenuSchema), // Then validate req.body
+  processMedia,
+  validate(createMenuSchema),
   createMenuItem,
 );
 
 router.patch(
   "/:id",
   verifyAdmin,
-  processMedia, // Parse multipart/form-data first
+  processMedia,
   validate(updateMenuSchema),
   updateMenuItem,
 );
 
-router.delete(
-  "/:id",
-  verifyAdmin,
-  deleteMenuItem,
-);
+router.delete("/:id", verifyAdmin, deleteMenuItem);
 
 export default router;
-

@@ -8,24 +8,22 @@ import toMenuResponse from "../utils/menuMapper.js";
 // ─────────────────────────────────────────────
 
 export const getMenu = async (req, res) => {
-
   try {
     const items = await prisma.menuItem.findMany({
       orderBy: {
         createdAt: "desc",
       },
+
+      include: {
+        images: {
+          orderBy: {
+            order: "asc",
+          },
+        },
+      },
     });
 
-    items.forEach((item) => {
-      logger.info({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        category: item.category,
-        imageUrl: item.imageUrl,
-        publicId: item.publicId,
-      });
-    });
+    logger.info(`Fetched ${items.length} menu items.`);
 
     const response = items.map(toMenuResponse);
 
@@ -39,43 +37,33 @@ export const getMenu = async (req, res) => {
   }
 };
 
-
 // ─────────────────────────────────────────────
 // CREATE MENU ITEM
 // ─────────────────────────────────────────────
 
 export const createMenuItem = async (req, res) => {
   try {
+    logger.info("\n========== CREATE MENU ITEM ==========");
+
     logger.info("Request body:", req.body);
     logger.info("Uploaded media:", req.media);
 
     const { name, price, category } = req.body;
 
-    logger.info("Parsed values:", {
-      name,
-      price,
-      category,
-      priceType: typeof price,
-      categoryType: typeof category,
-    });
-
     if (!name || price === undefined || !category) {
-      logger.info("Validation failed: missing required fields");
-
       return res.status(400).json({
         message: "Name, price and category are required",
       });
     }
 
-    const validCategories = ["FOOD", "DRINK", "ROOM"];
+    const images = req.media || [];
 
-    if (!validCategories.includes(category)) {
-      logger.info("Invalid category:", category);
-
-      return res.status(400).json({
-        message: "Invalid menu category",
-      });
-    }
+    logger.info("Creating menu item:", {
+      name,
+      price,
+      category,
+      imageCount: images.length,
+    });
 
     const item = await prisma.menuItem.create({
       data: {
@@ -83,17 +71,30 @@ export const createMenuItem = async (req, res) => {
         price: Number(price),
         category,
 
-        imageUrl: req.media?.url || null,
-        publicId: req.media?.publicId || null,
+        images: {
+          create: images.map((image, index) => ({
+            url: image.url,
+            publicId: image.publicId,
+            order: index,
+          })),
+        },
+      },
+
+      include: {
+        images: {
+          orderBy: {
+            order: "asc",
+          },
+        },
       },
     });
 
-    logger.info("Created database item:");
+    logger.info("Created menu item:");
     console.dir(item, { depth: null });
 
     const response = toMenuResponse(item);
 
-    logger.info("Response being sent:");
+    logger.info("Response:");
     console.dir(response, { depth: null });
 
     logger.info("======================================\n");
@@ -108,50 +109,41 @@ export const createMenuItem = async (req, res) => {
   }
 };
 
-
 // ─────────────────────────────────────────────
 // UPDATE MENU ITEM
 // ─────────────────────────────────────────────
 
 export const updateMenuItem = async (req, res) => {
-  logger.info("\n========== UPDATE MENU ITEM ==========");
-
   try {
+    logger.info("\n========== UPDATE MENU ITEM ==========");
+
     const { id } = req.params;
+    const { name, price, category } = req.body;
+
+    const newImages = req.media || [];
 
     logger.info("Item ID:", id);
     logger.info("Request body:", req.body);
-    logger.info("Uploaded media:", req.media);
-
-    const { name, price, category } = req.body;
+    logger.info("New images:", newImages);
 
     const item = await prisma.menuItem.findUnique({
       where: {
         id,
       },
+
+      include: {
+        images: {
+          orderBy: {
+            order: "asc",
+          },
+        },
+      },
     });
 
-    logger.info("Existing database item:");
-    console.dir(item, { depth: null });
-
     if (!item) {
-      logger.info("Menu item not found");
-
       return res.status(404).json({
         message: "Menu item not found",
       });
-    }
-
-    if (category !== undefined) {
-      const validCategories = ["FOOD", "DRINK", "ROOM"];
-
-      if (!validCategories.includes(category)) {
-        logger.info("Invalid category:", category);
-
-        return res.status(400).json({
-          message: "Invalid menu category",
-        });
-      }
     }
 
     const data = {};
@@ -169,52 +161,75 @@ export const updateMenuItem = async (req, res) => {
     }
 
     // ─────────────────────────────────────────
-    // NEW IMAGE
+    // REPLACE IMAGES
     // ─────────────────────────────────────────
 
-    if (req.media) {
-      logger.info("New image uploaded:", req.media);
+    if (newImages.length > 0) {
+      logger.info(
+        `Replacing ${item.images.length} old image(s) with ${newImages.length} new image(s).`,
+      );
 
-      if (item.publicId) {
-        logger.info("Deleting old Cloudinary image:", item.publicId);
+      /*
+       * Delete old Cloudinary assets.
+       *
+       * We keep this operation best-effort so a failed
+       * Cloudinary deletion does not prevent the database
+       * update.
+       */
+      for (const image of item.images) {
+        if (!image.publicId) {
+          continue;
+        }
 
         try {
-          const cloudinaryResult =
-            await cloudinary.uploader.destroy(item.publicId);
+          const result = await cloudinary.uploader.destroy(image.publicId);
 
-          logger.info(
-            "Old Cloudinary image deletion result:",
-            cloudinaryResult,
-          );
+          logger.info("Deleted old Cloudinary image:", {
+            publicId: image.publicId,
+            result,
+          });
         } catch (error) {
           logger.error(
-            "Failed to delete old Cloudinary image:",
+            `Failed to delete Cloudinary image ${image.publicId}:`,
             error,
           );
         }
       }
 
-      data.imageUrl = req.media.url;
-      data.publicId = req.media.publicId;
-    }
+      /*
+       * Replace the database image records.
+       */
+      data.images = {
+        deleteMany: {},
 
-    logger.info("Prisma update data:");
-    console.dir(data, { depth: null });
+        create: newImages.map((image, index) => ({
+          url: image.url,
+          publicId: image.publicId,
+          order: index,
+        })),
+      };
+    }
 
     const updatedItem = await prisma.menuItem.update({
       where: {
         id,
       },
+
       data,
+
+      include: {
+        images: {
+          orderBy: {
+            order: "asc",
+          },
+        },
+      },
     });
 
-    logger.info("Updated database item:");
+    logger.info("Updated menu item:");
     console.dir(updatedItem, { depth: null });
 
     const response = toMenuResponse(updatedItem);
-
-    logger.info("Response being sent:");
-    console.dir(response, { depth: null });
 
     logger.info("======================================\n");
 
@@ -228,62 +243,60 @@ export const updateMenuItem = async (req, res) => {
   }
 };
 
-
 // ─────────────────────────────────────────────
 // DELETE MENU ITEM
 // ─────────────────────────────────────────────
 
 export const deleteMenuItem = async (req, res) => {
-  logger.info("\n========== DELETE MENU ITEM ==========");
-
   try {
-    const { id } = req.params;
+    logger.info("\n========== DELETE MENU ITEM ==========");
 
-    logger.info("Item ID:", id);
+    const { id } = req.params;
 
     const item = await prisma.menuItem.findUnique({
       where: {
         id,
       },
+
+      include: {
+        images: true,
+      },
     });
 
-    logger.info("Database item:");
-    console.dir(item, { depth: null });
-
     if (!item) {
-      logger.info("Menu item not found");
-
       return res.status(404).json({
         message: "Menu item not found",
       });
     }
 
+    logger.info("Deleting menu item:", {
+      id: item.id,
+      name: item.name,
+      imageCount: item.images.length,
+    });
+
     // ─────────────────────────────────────────
-    // DELETE CLOUDINARY IMAGE
+    // DELETE CLOUDINARY IMAGES
     // ─────────────────────────────────────────
 
-    if (item.publicId) {
-      logger.info(
-        "Deleting Cloudinary image:",
-        item.publicId,
-      );
+    for (const image of item.images) {
+      if (!image.publicId) {
+        continue;
+      }
 
       try {
-        const cloudinaryResult =
-          await cloudinary.uploader.destroy(item.publicId);
+        const result = await cloudinary.uploader.destroy(image.publicId);
 
-        logger.info(
-          "Cloudinary deletion result:",
-          cloudinaryResult,
-        );
+        logger.info("Deleted Cloudinary image:", {
+          publicId: image.publicId,
+          result,
+        });
       } catch (error) {
         logger.error(
-          "Failed to delete Cloudinary image:",
+          `Failed to delete Cloudinary image ${image.publicId}:`,
           error,
         );
       }
-    } else {
-      logger.info("No Cloudinary publicId found");
     }
 
     // ─────────────────────────────────────────
@@ -296,7 +309,7 @@ export const deleteMenuItem = async (req, res) => {
       },
     });
 
-    logger.info("Database item deleted successfully");
+    logger.info("Database item deleted successfully.");
     logger.info("======================================\n");
 
     return res.json({
@@ -311,4 +324,3 @@ export const deleteMenuItem = async (req, res) => {
     });
   }
 };
-
