@@ -13,7 +13,6 @@ export const getMenu = async (req, res) => {
       orderBy: {
         createdAt: "desc",
       },
-
       include: {
         images: {
           orderBy: {
@@ -23,13 +22,25 @@ export const getMenu = async (req, res) => {
       },
     });
 
-    logger.info(`Fetched ${items.length} menu items.`);
+    logger.info({
+      message: "Menu fetched successfully",
+      count: items.length,
+    });
 
     const response = items.map(toMenuResponse);
 
     return res.json(response);
   } catch (error) {
-    logger.error("GET MENU ERROR:", error);
+    logger.error({
+      message: "GET MENU ERROR",
+      error: {
+        name: error?.name,
+        message: error?.message,
+        code: error?.code,
+        meta: error?.meta,
+        stack: error?.stack,
+      },
+    });
 
     return res.status(500).json({
       message: "Failed to fetch menu",

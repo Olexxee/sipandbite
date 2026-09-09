@@ -12,6 +12,7 @@
     "start": "node main.js",
     "migrate:logger": "node scripts/migrateConsoleToLogger.js"
   },
+  
   "keywords": [],
   "author": "",
   "license": "ISC",
